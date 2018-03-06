@@ -270,11 +270,11 @@ module Optimizely
       end
 
       variation = decision['variation']
-      unless variation['featureEnabled']
-        @logger.log(Logger::INFO,
-                    "Feature '#{feature_flag_key}' is not enabled for user '#{user_id}'.")
-        return false
-      end
+      # unless variation['featureEnabled']
+      #   @logger.log(Logger::INFO,
+      #               "Feature '#{feature_flag_key}' is not enabled for user '#{user_id}'.")
+      #   return false
+      # end
 
       if decision.source == Optimizely::DecisionService::DECISION_SOURCE_EXPERIMENT
         # Send event if Decision came from an experiment.
