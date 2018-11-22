@@ -284,7 +284,7 @@ module Optimizely
         {
           experiment_key: experiment_key,
           user_id: user_id
-        }, @logger, Logger::DEBUG
+        }, @logger, Logger::DEBUG, @error_handler
       )
 
       unless @forced_variation_map.key? user_id
@@ -331,7 +331,12 @@ module Optimizely
 
       input_values = {experiment_key: experiment_key, user_id: user_id}
       input_values[:variation_key] = variation_key unless variation_key.nil?
-      return false unless Optimizely::Helpers::Validator.inputs_valid?(input_values, @logger, Logger::DEBUG)
+      return false unless Optimizely::Helpers::Validator.inputs_valid?(
+        input_values,
+        @logger,
+        Logger::DEBUG,
+        @error_handler
+      )
 
       experiment = get_experiment_from_key(experiment_key)
       experiment_id = experiment['id'] if experiment

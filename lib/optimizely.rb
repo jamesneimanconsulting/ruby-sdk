@@ -94,12 +94,16 @@ module Optimizely
         return nil
       end
 
-      return nil unless Optimizely::Helpers::Validator.inputs_valid?(
+      unless Optimizely::Helpers::Validator.inputs_valid?(
         {
           experiment_key: experiment_key,
-          user_id: user_id
-        }, @logger, Logger::ERROR
+          user_id: user_id,
+          attributes: attributes
+        }, @logger, Logger::ERROR, @error_handler
       )
+        @logger.log(Logger::INFO, "Not activating user '#{user_id}'.")
+        return nil
+      end
 
       variation_key = get_variation(experiment_key, user_id, attributes)
 
@@ -130,15 +134,14 @@ module Optimizely
         return nil
       end
 
-      return nil unless Optimizely::Helpers::Validator.inputs_valid?(
+      unless Optimizely::Helpers::Validator.inputs_valid?(
         {
           experiment_key: experiment_key,
-          user_id: user_id
-        }, @logger, Logger::ERROR
+          user_id: user_id,
+          attributes: attributes
+        }, @logger, Logger::ERROR, @error_handler
       )
-
-      unless user_inputs_valid?(attributes)
-        @logger.log(Logger::INFO, "Not activating user '#{user_id}.")
+        @logger.log(Logger::INFO, "Not activating user '#{user_id}'.")
         return nil
       end
 
@@ -195,11 +198,11 @@ module Optimizely
       return nil unless Optimizely::Helpers::Validator.inputs_valid?(
         {
           event_key: event_key,
-          user_id: user_id
-        }, @logger, Logger::ERROR
+          user_id: user_id,
+          attributes: attributes,
+          event_tags: event_tags
+        }, @logger, Logger::ERROR, @error_handler
       )
-
-      return nil unless user_inputs_valid?(attributes, event_tags)
 
       experiment_ids = @config.get_experiment_ids_for_event(event_key)
       if experiment_ids.empty?
@@ -254,11 +257,10 @@ module Optimizely
       return false unless Optimizely::Helpers::Validator.inputs_valid?(
         {
           feature_flag_key: feature_flag_key,
-          user_id: user_id
-        }, @logger, Logger::ERROR
+          user_id: user_id,
+          attributes: attributes
+        }, @logger, Logger::ERROR, @error_handler
       )
-
-      return false unless user_inputs_valid?(attributes)
 
       feature_flag = @config.get_feature_flag_from_key(feature_flag_key)
       unless feature_flag
@@ -309,11 +311,10 @@ module Optimizely
 
       return enabled_features unless Optimizely::Helpers::Validator.inputs_valid?(
         {
-          user_id: user_id
-        }, @logger, Logger::ERROR
+          user_id: user_id,
+          attributes: attributes
+        }, @logger, Logger::ERROR, @error_handler
       )
-
-      return enabled_features unless user_inputs_valid?(attributes)
 
       @config.feature_flags.each do |feature|
         enabled_features.push(feature['key']) if is_feature_enabled(
@@ -453,12 +454,11 @@ module Optimizely
           feature_flag_key: feature_flag_key,
           variable_key: variable_key,
           user_id: user_id,
-          variable_type: variable_type
+          variable_type: variable_type,
+          attributes: attributes
         },
-        @logger, Logger::ERROR
+        @logger, Logger::ERROR, @error_handler
       )
-
-      return nil unless user_inputs_valid?(attributes)
 
       feature_flag = @config.get_feature_flag_from_key(feature_flag_key)
       unless feature_flag
@@ -528,39 +528,6 @@ module Optimizely
       end
 
       valid_experiments
-    end
-
-    def user_inputs_valid?(attributes = nil, event_tags = nil)
-      # Helper method to validate user inputs.
-      #
-      # attributes - Dict representing user attributes.
-      # event_tags - Dict representing metadata associated with an event.
-      #
-      # Returns boolean True if inputs are valid. False otherwise.
-
-      return false if !attributes.nil? && !attributes_valid?(attributes)
-
-      return false if !event_tags.nil? && !event_tags_valid?(event_tags)
-
-      true
-    end
-
-    def attributes_valid?(attributes)
-      unless Helpers::Validator.attributes_valid?(attributes)
-        @logger.log(Logger::ERROR, 'Provided attributes are in an invalid format.')
-        @error_handler.handle_error(InvalidAttributeFormatError)
-        return false
-      end
-      true
-    end
-
-    def event_tags_valid?(event_tags)
-      unless Helpers::Validator.event_tags_valid?(event_tags)
-        @logger.log(Logger::ERROR, 'Provided event tags are in an invalid format.')
-        @error_handler.handle_error(InvalidEventTagFormatError)
-        return false
-      end
-      true
     end
 
     def validate_instantiation_options(datafile, skip_json_validation)

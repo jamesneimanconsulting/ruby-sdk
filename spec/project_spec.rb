@@ -263,19 +263,27 @@ describe 'Optimizely' do
     end
 
     it 'should return nil when attributes are invalid' do
-      allow(project_instance).to receive(:attributes_valid?).and_return(false)
+      expect(Optimizely::Helpers::Validator).to receive(:inputs_valid?).with(
+        {
+          experiment_key: 'test_experiment_with_audience',
+          user_id: 'test_user2',
+          attributes: 'invalid'
+        }, spy_logger, Logger::ERROR, error_handler
+      )
       expect(project_instance.activate('test_experiment_with_audience', 'test_user2', 'invalid')).to eq(nil)
       expect(spy_logger).to have_received(:log).once.with(Logger::INFO, "Not activating user 'test_user2'.")
     end
 
     it 'should call inputs_valid? with the proper arguments in activate' do
+      user_attributes = {browser_type: 'chrome'}
       expect(Optimizely::Helpers::Validator).to receive(:inputs_valid?).with(
         {
           experiment_key: 'test_experiment_with_audience',
-          user_id: 'test_user'
-        }, spy_logger, Logger::ERROR
+          user_id: 'test_user',
+          attributes: user_attributes
+        }, spy_logger, Logger::ERROR, error_handler
       )
-      project_instance.activate('test_experiment_with_audience', 'test_user')
+      project_instance.activate('test_experiment_with_audience', 'test_user', user_attributes)
     end
 
     it 'should log return nil when user ID is non string' do
@@ -325,6 +333,74 @@ describe 'Optimizely' do
                                                             experiment_key: 'test_experiment',
                                                             variation_key: 'test_variation'
                                                           }, spy_logger, Logger::ERROR)).to eq(true)
+    end
+
+    it 'should log, raise error and return false when invalid attributes are passed' do
+      expect(error_handler).to receive(:handle_error).with(Optimizely::InvalidAttributeFormatError).exactly(4).times
+
+      expect(Optimizely::Helpers::Validator.inputs_valid?(
+               {
+                 experiment_key: 'valid_key',
+                 attributes: 'invalid'
+               }, spy_logger, Logger::ERROR, error_handler
+             )).to eq(false)
+
+      expect(Optimizely::Helpers::Validator.inputs_valid?(
+               {
+                 experiment_key: 'valid_key',
+                 attributes: 5
+               }, spy_logger, Logger::ERROR, error_handler
+             )).to eq(false)
+
+      expect(Optimizely::Helpers::Validator.inputs_valid?(
+               {
+                 experiment_key: 'valid_key',
+                 attributes: 5.5
+               }, spy_logger, Logger::ERROR, error_handler
+             )).to eq(false)
+
+      expect(Optimizely::Helpers::Validator.inputs_valid?(
+               {
+                 experiment_key: 'valid_key',
+                 attributes: true
+               }, spy_logger, Logger::ERROR, error_handler
+             )).to eq(false)
+
+      expect(spy_logger).to have_received(:log).with(Logger::ERROR, 'Provided attributes are in an invalid format.').exactly(4).times
+    end
+
+    it 'should log, raise error and return false when invalid event_tags are passed' do
+      expect(error_handler).to receive(:handle_error).with(Optimizely::InvalidEventTagFormatError).exactly(4).times
+
+      expect(Optimizely::Helpers::Validator.inputs_valid?(
+               {
+                 experiment_key: 'valid_key',
+                 event_tags: 'invalid'
+               }, spy_logger, Logger::ERROR, error_handler
+             )).to eq(false)
+
+      expect(Optimizely::Helpers::Validator.inputs_valid?(
+               {
+                 experiment_key: 'valid_key',
+                 event_tags: 5
+               }, spy_logger, Logger::ERROR, error_handler
+             )).to eq(false)
+
+      expect(Optimizely::Helpers::Validator.inputs_valid?(
+               {
+                 experiment_key: 'valid_key',
+                 event_tags: 5.5
+               }, spy_logger, Logger::ERROR, error_handler
+             )).to eq(false)
+
+      expect(Optimizely::Helpers::Validator.inputs_valid?(
+               {
+                 experiment_key: 'valid_key',
+                 event_tags: true
+               }, spy_logger, Logger::ERROR, error_handler
+             )).to eq(false)
+
+      expect(spy_logger).to have_received(:log).with(Logger::ERROR, 'Provided event tags are in an invalid format.').exactly(4).times
     end
 
     it 'should not log when logger or level are nil' do
@@ -453,13 +529,17 @@ describe 'Optimizely' do
     end
 
     it 'should call inputs_valid? with the proper arguments in track' do
+      user_attributes = {browser_type: 'chrome'}
+      event_tags = {revenue: 42}
       expect(Optimizely::Helpers::Validator).to receive(:inputs_valid?).with(
         {
           event_key: 'test_event',
-          user_id: 'test_user'
-        }, spy_logger, Logger::ERROR
+          user_id: 'test_user',
+          attributes: user_attributes,
+          event_tags: event_tags
+        }, spy_logger, Logger::ERROR, error_handler
       )
-      project_instance.track('test_event', 'test_user')
+      project_instance.track('test_event', 'test_user', user_attributes, event_tags)
     end
 
     it 'should log and return nil when user ID is non string' do
@@ -646,13 +726,15 @@ describe 'Optimizely' do
 
   describe '#get_variation' do
     it 'should call inputs_valid? with the proper arguments in get_variation' do
+      user_attributes = {browser_type: 'chrome'}
       expect(Optimizely::Helpers::Validator).to receive(:inputs_valid?).with(
         {
           experiment_key: 'test_experiment_with_audience',
-          user_id: 'test_user'
-        }, spy_logger, Logger::ERROR
+          user_id: 'test_user',
+          attributes: user_attributes
+        }, spy_logger, Logger::ERROR, error_handler
       )
-      project_instance.get_variation('test_experiment_with_audience', 'test_user', nil)
+      project_instance.get_variation('test_experiment_with_audience', 'test_user', user_attributes)
     end
 
     it 'should log and return nil when user ID is non string' do
@@ -691,9 +773,11 @@ describe 'Optimizely' do
     end
 
     it 'should have get_variation return nil when attributes are invalid' do
-      allow(project_instance).to receive(:attributes_valid?).and_return(false)
+      expect(Optimizely::Helpers::Validator).to receive(:attributes_valid?).once.with('invalid')
+      expect(error_handler).to receive(:handle_error).once.with(Optimizely::InvalidAttributeFormatError)
       expect(project_instance.get_variation('test_experiment_with_audience', 'test_user', 'invalid')).to eq(nil)
-      expect(spy_logger).to have_received(:log).once.with(Logger::INFO, "Not activating user 'test_user.")
+      expect(spy_logger).to have_received(:log).once.with(Logger::ERROR, 'Provided attributes are in an invalid format.')
+      expect(spy_logger).to have_received(:log).once.with(Logger::INFO, "Not activating user 'test_user'.")
     end
 
     it 'should have get_variation return nil when audience conditions do not match' do
@@ -800,13 +884,15 @@ describe 'Optimizely' do
     end
 
     it 'should call inputs_valid? with the proper arguments in is_feature_enabled' do
+      user_attributes = {browser_type: 'chrome'}
       expect(Optimizely::Helpers::Validator).to receive(:inputs_valid?).with(
         {
           feature_flag_key: 'multi_variate_feature',
-          user_id: 'test_user'
-        }, spy_logger, Logger::ERROR
+          user_id: 'test_user',
+          attributes: user_attributes
+        }, spy_logger, Logger::ERROR, error_handler
       )
-      project_instance.is_feature_enabled('multi_variate_feature', 'test_user')
+      project_instance.is_feature_enabled('multi_variate_feature', 'test_user', user_attributes)
     end
 
     it 'should log and return false when user ID is non string' do
@@ -931,12 +1017,14 @@ describe 'Optimizely' do
     end
 
     it 'should call inputs_valid? with the proper arguments in get_enabled_features' do
+      user_attributes = {browser_type: 'chrome'}
       expect(Optimizely::Helpers::Validator).to receive(:inputs_valid?).with(
         {
-          user_id: 'test_user'
-        }, spy_logger, Logger::ERROR
+          user_id: 'test_user',
+          attributes: user_attributes
+        }, spy_logger, Logger::ERROR, error_handler
       )
-      project_instance.get_enabled_features('test_user')
+      project_instance.get_enabled_features('test_user', user_attributes)
     end
 
     it 'should return empty when no feature flag is enabled' do
@@ -1258,13 +1346,15 @@ describe 'Optimizely' do
     end
 
     it 'should call inputs_valid? with the proper arguments in get_feature_variable_for_type' do
+      user_attributes = {browser_type: 'chrome'}
       expect(Optimizely::Helpers::Validator).to receive(:inputs_valid?).with(
         {
           feature_flag_key: 'integer_single_variable_feature',
           variable_key: 'integer_variable',
           user_id: 'test_user',
-          variable_type: 'integer'
-        }, spy_logger, Logger::ERROR
+          variable_type: 'integer',
+          attributes: user_attributes
+        }, spy_logger, Logger::ERROR, error_handler
       )
       project_instance.get_feature_variable_integer('integer_single_variable_feature', 'integer_variable', 'test_user', user_attributes)
     end

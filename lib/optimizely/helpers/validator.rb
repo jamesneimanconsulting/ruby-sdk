@@ -16,6 +16,7 @@
 #    limitations under the License.
 #
 require_relative 'constants'
+require_relative '../exceptions'
 require 'json'
 require 'json-schema'
 
@@ -31,7 +32,9 @@ module Optimizely
         #
         # Returns boolean depending on validity of attributes.
 
-        attributes.is_a?(Hash)
+        return true if attributes.nil? || attributes.is_a?(Hash)
+
+        false
       end
 
       def event_tags_valid?(event_tags)
@@ -41,7 +44,9 @@ module Optimizely
         #
         # Returns boolean depending on validity of event tags.
 
-        event_tags.is_a?(Hash)
+        return true if event_tags.nil? || event_tags.is_a?(Hash)
+
+        false
       end
 
       def datafile_valid?(datafile)
@@ -96,7 +101,7 @@ module Optimizely
         false
       end
 
-      def inputs_valid?(variables, logger = NoOpLogger.new, level = Logger::ERROR)
+      def inputs_valid?(variables, logger = NoOpLogger.new, level = Logger::ERROR, error_handler = NoOpErrorHandler.new)
         # Determines if values of variables in given array are non empty string.
         #
         # variables - array values to validate.
@@ -107,6 +112,18 @@ module Optimizely
 
         return false unless variables.respond_to?(:each) && !variables.empty?
 
+        unless attributes_valid?(variables[:attributes])
+          logger.log(Logger::ERROR, 'Provided attributes are in an invalid format.')
+          error_handler.handle_error(InvalidAttributeFormatError)
+          return false
+        end
+
+        unless event_tags_valid?(variables[:event_tags])
+          logger.log(Logger::ERROR, 'Provided event tags are in an invalid format.')
+          error_handler.handle_error(InvalidEventTagFormatError)
+          return false
+        end
+
         is_valid = true
         if variables.include? :user_id
           # Empty str is a valid user ID.
@@ -114,8 +131,9 @@ module Optimizely
             is_valid = false
             logger.log(level, "#{Constants::INPUT_VARIABLES['USER_ID']} is invalid")
           end
-          variables.delete :user_id
         end
+
+        variables.delete_if { |key, _value| %w[attributes event_tags user_id].include? key.to_s }
 
         variables.each do |key, value|
           next if value.is_a?(String) && !value.empty?

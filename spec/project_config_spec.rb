@@ -949,7 +949,7 @@ describe Optimizely::ProjectConfig do
           experiment_key: @valid_experiment[:key],
           user_id: @user_id,
           variation_key: @valid_variation[:key]
-        }, spy_logger, Logger::DEBUG
+        }, spy_logger, Logger::DEBUG, error_handler
       )
       config.set_forced_variation(@valid_experiment[:key], @user_id, @valid_variation[:key])
     end
@@ -969,7 +969,7 @@ describe Optimizely::ProjectConfig do
         {
           experiment_key: @valid_experiment[:key],
           user_id: @user_id
-        }, spy_logger, Logger::DEBUG
+        }, spy_logger, Logger::DEBUG, error_handler
       )
       config.get_forced_variation(@valid_experiment[:key], @user_id)
     end
